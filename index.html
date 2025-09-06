@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Quantum Multi-Agentic Campaign Manager (Demo)</title>
+  <style>
+    :root{
+      --bg:#0b0f14;
+      --card:#131a22;
+      --muted:#9bb0c5;
+      --text:#e8f0fa;
+      --accent:#5da9ff;
+      --accent2:#8df5c5;
+      --warn:#ffb86b;
+      --danger:#ff6b6b;
+      --ok:#6bff95;
+      --grid:#1d2733;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      background: linear-gradient(180deg, #0b0f14, #0d141c 35%, #0b0f14 100%);
+      color:var(--text);
+    }
+    header{padding:24px 16px;text-align:center;border-bottom:1px solid var(--grid);}
+    h1{margin:0 0 8px;font-size:clamp(20px,3vw,28px)}
+    .sub{color:var(--muted);font-size:14px}
+    main{max-width:1200px;margin:0 auto;padding:16px;display:grid;gap:16px}
+    .card{background:var(--card);border:1px solid var(--grid);border-radius:12px;padding:14px;box-shadow:0 10px 20px rgba(0,0,0,.25)}
+    .grid-2{display:grid;gap:16px}
+    @media (min-width:900px){.grid-2{grid-template-columns:1fr 1fr}}
+    label{font-size:13px;color:var(--muted)}
+    input, select, button{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--grid);background:#0f1620;color:var(--text);}
+    button{cursor:pointer;background:linear-gradient(135deg, var(--accent), #63ffd7);color:#051018;font-weight:700;border:none;}
+    .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+    .kpi{background:#0f1620;border:1px solid var(--grid);border-radius:10px;padding:10px}
+    .kpi .name{font-size:12px;color:var(--muted)} .kpi .val{font-size:18px;font-weight:700}
+    canvas{width:100%;height:260px;background:#0b121a;border-radius:10px;border:1px solid var(--grid)}
+    table{width:100%;border-collapse:collapse;font-size:14px}
+    th,td{padding:8px;border-bottom:1px solid var(--grid);text-align:left}
+    th{color:var(--muted);font-weight:600}
+    .footer{color:var(--muted);font-size:12px;text-align:center;padding:10px}
+    .btn-row{display:flex;gap:10px;flex-wrap:wrap}
+    .headline{padding:8px;border:1px solid var(--grid);border-radius:8px;background:#0f1620;margin-bottom:8px}
+    .ok{color:var(--ok)} .warn{color:var(--warn)} .bad{color:var(--danger)}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Quantum Multi-Agentic Campaign Manager (Demo)</h1>
+    <div class="sub">Educational demo • Simulated data only • No external libraries</div>
+  </header>
+
+  <main>
+    <!-- Input Form -->
+    <section class="card">
+      <h3>Inputs</h3>
+      <div class="btn-row">
+        <button id="btnGenerate">Generate Demo</button>
+        <button id="btnRegen">Regenerate</button>
+        <button id="btnExport">Export JSON</button>
+      </div>
+      <div class="grid-2">
+        <div>
+          <label>Candidate Name</label>
+          <input id="inpName" placeholder="Jane Doe"/>
+        </div>
+        <div>
+          <label>Affiliation</label>
+          <select id="inpParty"><option>Democrat</option><option>Republican</option></select>
+        </div>
+        <div>
+          <label>District</label>
+          <input id="inpDistrict" type="number" placeholder="13"/>
+        </div>
+        <div>
+          <label>Race Type</label>
+          <select id="inpRace"><option>General</option><option>Primary</option></select>
+        </div>
+      </div>
+    </section>
+
+    <!-- Executive Summary -->
+    <section class="card" id="execCard">
+      <h3>Executive Summary</h3>
+      <div class="kpis">
+        <div class="kpi"><div class="name">Polling</div><div class="val" id="kpiPoll"></div></div>
+        <div class="kpi"><div class="name">Lead</div><div class="val" id="kpiLead"></div></div>
+        <div class="kpi"><div class="name">Donations Today</div><div class="val" id="kpiDon"></div></div>
+        <div class="kpi"><div class="name">Messages Today</div><div class="val" id="kpiComms"></div></div>
+      </div>
+    </section>
+
+    <!-- Charts -->
+    <section class="card"><h3>Polling</h3><canvas id="pollChart"></canvas></section>
+    <section class="card"><h3>Emails</h3><canvas id="emailChart"></canvas></section>
+    <section class="card"><h3>SMS & Voice</h3><canvas id="msgChart"></canvas></section>
+    <section class="card"><h3>Donations</h3><canvas id="donChart"></canvas></section>
+
+    <!-- Media -->
+    <section class="card"><h3>Media</h3><div id="mediaList"></div></section>
+    <!-- Adversaries -->
+    <section class="card"><h3>Adversaries</h3><table id="advTable"><thead><tr><th>Name</th><th>Poll %</th><th>Spend</th></tr></thead><tbody></tbody></table></section>
+
+    <section class="footer">Educational demo, simulated data only, no PII, no micro-targeting.</section>
+  </main>
+
+  <script>
+    // === Utilities ===
+    function seededRand(seed){let h=0;for(let i=0;i<seed.length;i++)h=Math.imul(31,h)+seed.charCodeAt(i)|0;return ()=>{h=Math.imul(48271,h)%2147483647;return (h&2147483647)/2147483647;};}
+    function randRange(r,min,max){return min+(max-min)*r();}
+    function randInt(r,min,max){return Math.floor(randRange(r,min,max+1));}
+
+    // === Data generator ===
+    function generateData({candidate,party,district,raceType,seedSalt=""}){
+      const r=seededRand(candidate+party+district+raceType+seedSalt);
+      const days=Array.from({length:15},(_,i)=>i);
+      const pollsC=days.map(()=>randInt(r,38,54));
+      const pollsA=days.map(()=>pollsC[0]-randInt(r,3,12));
+      const emails=days.map(()=>randInt(r,900,1200));
+      const sms=days.map(()=>randInt(r,1600,2000));
+      const donations=days.map(()=>randInt(r,13000,27000));
+      const media=[{title:"Local jobs plan gains traction",sent:0.3},{title:"Town hall sees strong turnout",sent:-0.2}];
+      const adv=[{name:"Rival A",poll:pollsA[14],spend:"$15k"},{name:"Rival B",poll:10,spend:"$6k"}];
+      return {candidate,party,district,raceType,pollsC,pollsA,emails,sms,donations,media,adv};
+    }
+
+    // === Simple chart ===
+    function drawLine(ctx,data,color){
+      ctx.beginPath();ctx.strokeStyle=color;ctx.moveTo(0,200-data[0]/2);
+      data.forEach((v,i)=>ctx.lineTo(i*20,200-v/2));
+      ctx.stroke();
+    }
+    function drawBar(ctx,data,color){
+      ctx.fillStyle=color;data.forEach((v,i)=>ctx.fillRect(i*20,200-v/50,10,v/50));
+    }
+
+    // === Render ===
+    let state={};
+    function render(){
+      const d=state;
+      document.getElementById("kpiPoll").textContent=d.pollsC[14]+"%";
+      document.getElementById("kpiLead").textContent=(d.pollsC[14]-d.pollsA[14])+"%";
+      document.getElementById("kpiDon").textContent="$"+d.donations[14];
+      document.getElementById("kpiComms").textContent=d.sms[14]+" msgs";
+
+      const pc=document.getElementById("pollChart").getContext("2d");pc.clearRect(0,0,600,200);
+      drawLine(pc,d.pollsC,"#5da9ff");drawLine(pc,d.pollsA,"#ff6b6b");
+
+      const ec=document.getElementById("emailChart").getContext("2d");ec.clearRect(0,0,600,200);
+      drawBar(ec,d.emails,"#8df5c5");
+
+      const mc=document.getElementById("msgChart").getContext("2d");mc.clearRect(0,0,600,200);
+      drawBar(mc,d.sms,"#ffb86b");
+
+      const dc=document.getElementById("donChart").getContext("2d");dc.clearRect(0,0,600,200);
+      drawBar(dc,d.donations,"#5da9ff");
+
+      const ml=document.getElementById("mediaList");ml.innerHTML="";d.media.forEach(m=>ml.innerHTML+=`<div class="headline">${m.title} <span>${m.sent}</span></div>`);
+      const adv=document.getElementById("advTable").querySelector("tbody");adv.innerHTML="";d.adv.forEach(a=>adv.innerHTML+=`<tr><td>${a.name}</td><td>${a.poll}%</td><td>${a.spend}</td></tr>`);
+    }
+
+    // === Events ===
+    function run(seedSalt=""){const inp={candidate:inpName.value||"Alex",party:inpParty.value,district:inpDistrict.value||13,raceType:inpRace.value};state=generateData({...inp,seedSalt});render();}
+    document.getElementById("btnGenerate").onclick=()=>run();
+    document.getElementById("btnRegen").onclick=()=>run(Math.random().toString());
+    document.getElementById("btnExport").onclick=()=>{const blob=new Blob([JSON.stringify(state)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="campaignData.json";a.click();}
+    run();
+  </script>
+</body>
+</html>
